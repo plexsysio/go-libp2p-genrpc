@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package pb.v1;
+
+message Message {
+  map<string, bytes> headers = 1;
+  bytes body = 2;
+  string error = 3;
+}
