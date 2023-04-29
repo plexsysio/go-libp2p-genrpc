@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -513,7 +513,12 @@ func TestUpStreamHandler(t *testing.T) {
 
 			err = wrappedStream.WriteMsg(ctx, &pbv1.Message{Body: body})
 			if err != nil {
-				t.Fatalf("unexpected error writing req: %v", err)
+				select {
+				case <-gotErr:
+					break LOOP
+				case <-time.After(1 * time.Second):
+					t.Fatalf("unexpected error writing req: %v", err)
+				}
 			}
 
 			time.Sleep(5 * time.Millisecond)
@@ -569,6 +574,7 @@ func TestDownStreamHandler(t *testing.T) {
 			t.Fatalf("unexpected error writing req: %v", err)
 		}
 
+		i := 0
 		for {
 			msg, err := wrappedStream.ReadMsg(ctx)
 			if errors.Is(err, io.EOF) {
@@ -592,13 +598,13 @@ func TestDownStreamHandler(t *testing.T) {
 				t.Fatalf("failed unmarshaling message: %v", err)
 			}
 
-			if !reflect.DeepEqual(resp, resps[0]) {
-				t.Fatalf("incorrect response arg received: got %s want %s", resp.Arg, resps[0].Arg)
+			if !reflect.DeepEqual(resp, resps[i]) {
+				t.Fatalf("incorrect response arg received: got %s want %s", resp.Arg, resps[i].Arg)
 			}
-			resps = resps[1:]
+			i++
 		}
 
-		if len(resps) != 0 {
+		if len(resps) != i {
 			t.Fatalf("expected all responses to be read")
 		}
 	})
@@ -655,6 +661,7 @@ func TestDownStreamHandler(t *testing.T) {
 		tReq := &testReq{Arg: "test"}
 		resps := make([]*testResp, 10)
 		tHdr := map[string][]byte{"key": []byte("value")}
+		mtx := sync.Mutex{}
 
 		for i := 0; i < 10; i++ {
 			resps[i] = &testResp{Arg: fmt.Sprintf("message #%d", i+1)}
@@ -669,7 +676,9 @@ func TestDownStreamHandler(t *testing.T) {
 				go func() {
 					defer close(respC)
 					for _, r := range resps {
+						mtx.Lock()
 						r.Arg += ctx.Value(ctxKey{}).(string)
+						mtx.Unlock()
 						respC <- r
 					}
 				}()
@@ -706,6 +715,7 @@ func TestDownStreamHandler(t *testing.T) {
 			t.Fatalf("unexpected error writing req: %v", err)
 		}
 
+		i := 0
 		for {
 			msg, err := wrappedStream.ReadMsg(ctx)
 			if errors.Is(err, io.EOF) {
@@ -729,11 +739,13 @@ func TestDownStreamHandler(t *testing.T) {
 				t.Fatalf("failed unmarshaling message: %v", err)
 			}
 
-			arg := "message #" + strconv.Itoa(len(resps)) + "value"
-			if !reflect.DeepEqual(resp, resps[0]) {
-				t.Fatalf("incorrect response arg received: got %s want %s", resp.Arg, arg)
+			mtx.Lock()
+			want := resps[i]
+			mtx.Unlock()
+			if !reflect.DeepEqual(resp, want) {
+				t.Fatalf("incorrect response arg received: got %s want %s", resp.Arg, want.Arg)
 			}
-			resps = resps[1:]
+			i++
 		}
 	})
 
