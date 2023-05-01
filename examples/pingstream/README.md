@@ -155,30 +155,30 @@ reports any error so we need to start sending messages on the request channel be
 calling the Execute.
 
 ```golang
-  go func() {
-		for numCalls < pingCount {
-			var args PingReq
-			c := randomDataSize
-			b := make([]byte, c)
-			_, err := rand.Read(b)
-			if err != nil {
-				panic(err)
-			}
-
-			args.Data = b
-			args.Start = time.Now()
-			reqC <- &args
-			reqs[numCalls] = &args
-			numCalls++
-			time.Sleep(betweenPingsSleep)
+go func() {
+	for numCalls < pingCount {
+		var args PingReq
+		c := randomDataSize
+		b := make([]byte, c)
+		_, err := rand.Read(b)
+		if err != nil {
+			panic(err)
 		}
-		close(reqC)
-	}()
 
-	replyC, err := req.Execute(ctx, peerInfo.ID, reqC)
-	if err != nil {
-		panic(err)
+		args.Data = b
+		args.Start = time.Now()
+		reqC <- &args
+		reqs[numCalls] = &args
+		numCalls++
+		time.Sleep(betweenPingsSleep)
 	}
+	close(reqC)
+}()
+
+replyC, err := req.Execute(ctx, peerInfo.ID, reqC)
+if err != nil {
+	panic(err)
+}
 ```
 
 Once the call above has finished, `reply.Data` should now have the same data
