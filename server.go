@@ -105,12 +105,12 @@ type (
 )
 
 // GetPeerID returns the peer id of the remote peer from the context.
-func GetPeerID(ctx context.Context) (string, error) {
+func GetPeerID(ctx context.Context) (peer.ID, error) {
 	peer, ok := ctx.Value(peerKey{}).(peer.ID)
 	if !ok {
 		return "", errors.New("failed to get peer id from context")
 	}
-	return peer.String(), nil
+	return peer, nil
 }
 
 // SetPeerID sets the peer id of the remote peer in the context.
