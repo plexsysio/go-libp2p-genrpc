@@ -105,12 +105,12 @@ type (
 )
 
 // GetPeerID returns the peer id of the remote peer from the context.
-func GetPeerID(ctx context.Context) (string, error) {
+func GetPeerID(ctx context.Context) (peer.ID, error) {
 	peer, ok := ctx.Value(peerKey{}).(peer.ID)
 	if !ok {
 		return "", errors.New("failed to get peer id from context")
 	}
-	return peer.String(), nil
+	return peer, nil
 }
 
 // SetPeerID sets the peer id of the remote peer in the context.
@@ -153,7 +153,7 @@ func Unary[Req any, Resp any](
 			return sWrap.WriteMsg(ctx, &pbv1.Message{Body: respBody})
 		}
 
-		ctx := context.WithValue(context.Background(), peerKey{}, stream.Conn().RemotePeer())
+		ctx := SetPeerID(context.Background(), stream.Conn().RemotePeer())
 		reqMsg, err := sWrap.ReadMsg(ctx)
 		if err != nil {
 			return
@@ -192,7 +192,7 @@ func UpStream[Req any, Resp any](
 		sWrap := wrapStream(stream)
 		defer stream.Close()
 
-		ctx := context.WithValue(context.Background(), peerKey{}, stream.Conn().RemotePeer())
+		ctx := SetPeerID(context.Background(), stream.Conn().RemotePeer())
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
@@ -328,7 +328,7 @@ func DownStream[Req any, Resp any](
 			return nil
 		}
 
-		ctx := context.WithValue(context.Background(), peerKey{}, stream.Conn().RemotePeer())
+		ctx := SetPeerID(context.Background(), stream.Conn().RemotePeer())
 		reqMsg, err := sWrap.ReadMsg(ctx)
 		if err != nil {
 			return
@@ -368,7 +368,7 @@ func BidirStream[Req any, Resp any](
 		sWrap := wrapStream(stream)
 		defer stream.Close()
 
-		ctx := context.WithValue(context.Background(), peerKey{}, stream.Conn().RemotePeer())
+		ctx := SetPeerID(context.Background(), stream.Conn().RemotePeer())
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
